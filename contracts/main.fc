@@ -1,0 +1,69 @@
+#include "imports/stdlib.fc";
+
+#include "storage.fc";
+#include "utils.fc";
+
+int op::users::return_result_from_oracle() asm "1300 PUSHINT";
+int op::users::get() asm "600 PUSHINT";
+
+(builder) convertIntToStr (builder string, int n) {
+        tuple chars = null();
+        do {
+                int r = n~divmod(10);
+                chars = cons(r + 48, chars);
+        } until (n == 0);
+        do {
+                int char = chars~list_next();
+                string~store_uint(char, 8);
+        } until (null?(chars));
+        return (string);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+        (slice oracle, slice admin, int er) = storage::load_data();
+        slice sender_address = utils::parse_sender_address(in_msg_full);
+
+        if (equal_slices(sender_address, oracle)) {
+                int op = in_msg_body~load_uint(32);
+                if (op == op::users::return_result_from_oracle()) {
+                        in_msg_body~load_uint(64);
+                        int er = in_msg_body~load_uint(64);
+                        storage::save_data(oracle, admin, er);
+
+                         var msg = begin_cell()
+                                .store_uint(0x18, 6)
+                                .store_slice(admin)
+                                .store_grams(0)
+                                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                                .store_uint(0, 32)
+                                .convertIntToStr(er)
+                        .end_cell();
+
+                        send_raw_message(msg, 64);
+                }
+        } else {
+                var msg_body = begin_cell()
+                        .store_uint(op::users::get() , 32)
+                        .store_uint(0, 64)
+                        .store_ref(begin_cell().store_uint(1, 2).end_cell())
+                .end_cell();
+
+                var msg = begin_cell()
+                        .store_uint(0x18, 6)
+                        .store_slice(oracle)
+                        .store_grams(0)
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                        .store_ref(msg_body)
+                        .store_slice(msg_body.begin_parse())
+                .end_cell();
+
+                send_raw_message(msg, 64);
+        }
+
+        return ();
+}
+
+int get_er() method_id {
+        (_, _, int er) = storage::load_data();
+        return er;
+}

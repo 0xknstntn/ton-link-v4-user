@@ -1,0 +1,14 @@
+(slice, slice, int) storage::load_data() inline {
+        slice ds = get_data().begin_parse();
+        return (ds~load_msg_addr(), ds~load_msg_addr(), ds~load_uint(64));
+}
+
+() storage::save_data(slice oracle, slice admin, int er) impure inline {
+        set_data(
+                begin_cell()
+                        .store_slice(oracle)
+                        .store_slice(admin)
+                        .store_uint(er, 64)
+                .end_cell()
+        );
+}
